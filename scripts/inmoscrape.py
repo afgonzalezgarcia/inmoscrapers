@@ -189,7 +189,8 @@ class InmoScrapers:
                                 if os.path.exists(config["store_results_in_csv"]["dir_to_store"]):
                                     if os.path.isdir(config["store_results_in_csv"]["dir_to_store"]):
                                         logging.info("[%s]Argument config[\"store_results_in_csv\"][\"dir_to_store\"]' is correct", MAIN_INFO_SOURCE)
-                                        config["store_results_in_csv"]["filename"] = "results_%s.csv" % (strftime("%Y%m%d%H%M%S"))
+                                        if not ("filename" in config["store_results_in_csv"]):
+                                            config["store_results_in_csv"]["filename"] = "results_%s.csv" % (strftime("%Y%m%d%H%M%S"))
                                     else:
                                         logging.error("[%s]Dir setted in argument: config[\"store_results_in_csv\"][\"dir_to_store\"]' doesn't exist. Please make sure that dir exist and try again", MAIN_INFO_SOURCE)
                                         process_info["message"] = "[%s]Dir setted in argument: config[\"store_results_in_csv\"][\"dir_to_store\"]' doesn't exist. Please make sure that dir exist and try again" % (MAIN_INFO_SOURCE)
@@ -316,6 +317,237 @@ class InmoScrapers:
 
         return process_info
 
+    """
+    This method recevies a specific broweser instance where you want to extract the info
+    """
+    @staticmethod
+    def scraping_data_from_specific_encuentra24_ad(browser, config, first_ad=False):
+        logging.info("Class InmoScrapers - method: scraping_data_from_specific_encuentra24_ad")
+        process_info = {
+            "success": False,
+            "message": "",
+            "result": {}
+        }
+        if "main_info_source" in config:
+            MAIN_INFO_SOURCE = config["main_info_source"]
+        else:
+            MAIN_INFO_SOURCE = "encuentra24"
+            config["main_info_source"] = MAIN_INFO_SOURCE
+
+        if browser is None:
+            logging.error("[%s]Browser is not instanced", MAIN_INFO_SOURCE)
+            process_info["message"] = process_info["message"] + "\n[%s]Browser is not instanced" % (MAIN_INFO_SOURCE)
+            return process_info
+
+        d_ad_info = {
+            "ad_id": "",
+            "ad_title": "",
+            "ad_url": "",
+            "ad_offer_price": "",
+            "ad_photo": "",
+            "ad_info_list": [],
+            "ad_info_str": "",
+            "ad_details_list": [],
+            "ad_details_str": "",
+            "ad_product_features_list": [],
+            "ad_product_features_str": "",
+            "ad_contact_info_username": "",
+            "ad_contact_info_attrs_list": [],
+            "ad_contact_info_attrs_str": "",
+            "ad_contact_info_phone": "",
+            "ad_contact_info_cellphone": "",
+        }
+        # ad id xpath
+        ad_id_xpath = "//span[@class = 'ad-id']"
+
+        # ads title xpath
+        ad_title_xpath = "//h1[@class = 'product-title']"
+
+        try:
+            logging.info("[%s]Getting data from: %s", MAIN_INFO_SOURCE, browser.url)
+
+            counter_element_xpath = "//ul[@class = 'pager']/li[@class = 'hidden-xs hidden-sm']"
+            if browser.is_element_present_by_xpath(counter_element_xpath):
+                if browser.find_by_xpath(counter_element_xpath).last.text:
+                    logging.info("[%s] %s", MAIN_INFO_SOURCE, browser.find_by_xpath(counter_element_xpath).last.text)
+
+            # ad id
+            if browser.is_element_present_by_xpath(ad_id_xpath):
+                if browser.find_by_xpath(ad_id_xpath).value:
+                    d_ad_info["ad_id"] = browser.find_by_xpath(ad_id_xpath).value
+
+            # ad title
+            if browser.is_element_present_by_xpath(ad_title_xpath):
+                if browser.find_by_xpath(ad_title_xpath).value:
+                    d_ad_info["ad_title"] = browser.find_by_xpath(ad_title_xpath).value.replace(";", " ").replace("|", " ")
+
+            # ad url
+            d_ad_info["ad_url"] = browser.url
+
+            # ad offer price
+            ad_offer_price_xpath = "//div[@class = 'offer-price']"
+            if browser.is_element_present_by_xpath(ad_offer_price_xpath):
+                if browser.find_by_xpath(ad_offer_price_xpath).text:
+                    d_ad_info["ad_offer_price"] = browser.find_by_xpath(ad_offer_price_xpath).text.replace(";", " ")
+
+            # ad photo
+            ad_photo_xpath = "//div[@id = 'tabPhotos']/descendant::div[contains(@class, 'slick-current slick-active')]/a/img"
+            if browser.is_element_present_by_xpath(ad_photo_xpath):
+                if browser.find_by_xpath(ad_photo_xpath)["src"]:
+                    d_ad_info["ad_photo"] = browser.find_by_xpath(ad_photo_xpath)["src"]
+
+            # general info to the ad
+            ad_info_xpath = "//div[@class = 'ad-info']/div/div/div/ul/li"
+            ad_info_list = []
+            if browser.is_element_present_by_xpath(ad_info_xpath):
+                for i in range(0, len(browser.find_by_xpath(ad_info_xpath))):
+                    ad_info_str = ""
+                    ad_specific_infoname_xpath = "%s[%d]/span[@class = 'info-name']" % (ad_info_xpath, (i + 1))
+                    ad_specific_infovalue_xpath = "%s[%d]/span[@class = 'info-value']" % (ad_info_xpath, (i + 1))
+                    if browser.is_element_present_by_xpath(ad_specific_infoname_xpath):
+                        ad_info_str = ad_info_str + browser.find_by_xpath(ad_specific_infoname_xpath).text.replace(";", " ")
+
+                    if browser.is_element_present_by_xpath(ad_specific_infovalue_xpath):
+                        ad_info_str = ad_info_str + " " + browser.find_by_xpath(ad_specific_infovalue_xpath).text.replace(";", " ")
+
+                    ad_info_list.append(ad_info_str)
+                # end for i in range
+            # end if
+
+            # parsing ad info list to a str
+            if len(ad_info_list) > 0:
+                d_ad_info["ad_info_str"] = "|".join(ad_info_list)
+                d_ad_info["ad_info_list"] = ad_info_list
+
+            # details to the add
+            ad_details_xpath = "//div[@class = 'ad-details']/div/div/div/ul/li"
+            ad_details_list = []
+            if browser.is_element_present_by_xpath(ad_details_xpath):
+                for i in range(0, len(browser.find_by_xpath(ad_details_xpath))):
+                    ad_detail_str = ""
+                    ad_specific_infoname_xpath = "%s[%d]/span[@class = 'info-name']" % (ad_details_xpath, (i + 1))
+                    ad_specific_infovalue_xpath = "%s[%d]/span[@class = 'info-value']" % (ad_details_xpath, (i + 1))
+                    if browser.is_element_present_by_xpath(ad_specific_infoname_xpath):
+                        ad_detail_str = ad_detail_str + browser.find_by_xpath(ad_specific_infoname_xpath).text.replace(";", " ")
+
+                    if browser.is_element_present_by_xpath(ad_specific_infovalue_xpath):
+                        ad_detail_str = ad_detail_str + " " + browser.find_by_xpath(ad_specific_infovalue_xpath).text.replace(";", " ")
+
+                    ad_details_list.append(ad_detail_str)
+                # end for i in range
+            # end if
+
+            # parsing ad details list to a str
+            if len(ad_details_list) > 0:
+                d_ad_info["ad_details_str"] = "|".join(ad_details_list)
+                d_ad_info["ad_details_list"] = ad_details_list
+
+            # ad product features
+            ad_product_features_xpath = "//ul[@class = 'product-features']/li"
+            ad_product_features_list = []
+            if browser.is_element_present_by_xpath(ad_product_features_xpath):
+                for ad_product_feature in browser.find_by_xpath(ad_product_features_xpath):
+                    if ad_product_feature.text:
+                        ad_product_features_list.append(ad_product_feature.text.replace(";", " "))
+                # end for
+            # end if
+
+            # parsing ad product features list to a str
+            if len(ad_product_features_list) > 0:
+                d_ad_info["ad_product_features_str"] = "|".join(ad_product_features_list)
+                d_ad_info["ad_product_features_list"] = ad_product_features_list
+
+            # ad contact info
+            # ad contact info username
+            ad_contact_info_username_xpath = "//div[@class = 'user-info']/span[@class = 'user-name']"
+            if browser.is_element_present_by_xpath(ad_contact_info_username_xpath):
+                if browser.find_by_xpath(ad_contact_info_username_xpath).text:
+                    d_ad_info["ad_contact_info_username"] = browser.find_by_xpath(ad_contact_info_username_xpath).text.replace(";", " ")
+
+            # ad contact info attrs
+            ad_contact_info_attrs_xpath = "//div[@class = 'user-info']/span[@class = 'text-attr']"
+            ad_contact_info_attrs_list = []
+            if browser.is_element_present_by_xpath(ad_contact_info_attrs_xpath):
+                for ad_contact_info_attr in browser.find_by_xpath(ad_contact_info_attrs_xpath):
+                    ad_contact_info_attrs_list.append(ad_contact_info_attr.text.replace(";", " "))
+
+            # parsing ad contact info attrs list to a str
+            if len(ad_contact_info_attrs_list) > 0:
+                d_ad_info["ad_contact_info_attrs_str"] = "|".join(ad_contact_info_attrs_list)
+                d_ad_info["ad_contact_info_attrs_list"] = ad_contact_info_attrs_list
+
+            # ad contact info phone
+            ad_contact_info_phone_xpath = "//div[@class = 'contact-phone']/span[@class = 'phone icon icon-call']"
+            if browser.is_element_present_by_xpath(ad_contact_info_phone_xpath):
+                if browser.find_by_xpath(ad_contact_info_phone_xpath).text:
+                    d_ad_info["ad_contact_info_phone"] = browser.find_by_xpath(ad_contact_info_phone_xpath).text.split("\n")[0]
+
+            # ad contact info cellphone
+            ad_contact_info_cellphone_xpath = "//div[@class = 'contact-phone']/span[@class = 'cellphone icon icon-call-mobile']"
+            if browser.is_element_present_by_xpath(ad_contact_info_cellphone_xpath):
+                if browser.find_by_xpath(ad_contact_info_cellphone_xpath).text:
+                    d_ad_info["ad_contact_info_cellphone"] = browser.find_by_xpath(ad_contact_info_cellphone_xpath).text.split("\n")[0]
+
+            ################
+            if config["store_results_in_csv"]["store"]:
+                fieldnames = [
+                    "ad_id",
+                    "ad_title",
+                    "ad_url",
+                    "ad_offer_price",
+                    "ad_photo",
+                    "ad_info_str",
+                    "ad_details_str",
+                    "ad_product_features_str",
+                    "ad_contact_info_username",
+                    "ad_contact_info_attrs_str",
+                    "ad_contact_info_phone",
+                    "ad_contact_info_cellphone",
+                ]
+
+                fields_to_save = {
+                    "ad_id": d_ad_info["ad_id"],
+                    "ad_title": d_ad_info["ad_title"],
+                    "ad_url": d_ad_info["ad_url"],
+                    "ad_offer_price": d_ad_info["ad_offer_price"],
+                    "ad_photo": d_ad_info["ad_photo"],
+                    "ad_info_str": d_ad_info["ad_info_str"],
+                    "ad_details_str": d_ad_info["ad_details_str"],
+                    "ad_product_features_str": d_ad_info["ad_product_features_str"],
+                    "ad_contact_info_username": d_ad_info["ad_contact_info_username"],
+                    "ad_contact_info_attrs_str": d_ad_info["ad_contact_info_attrs_str"],
+                    "ad_contact_info_phone": d_ad_info["ad_contact_info_phone"],
+                    "ad_contact_info_cellphone": d_ad_info["ad_contact_info_cellphone"],
+                }
+
+                try:
+                    file_csv = open("%s/%s" % (config["store_results_in_csv"]["dir_to_store"], config["store_results_in_csv"]["filename"]), "a+")
+                    csv_dictwriter = unicodecsv.DictWriter(file_csv, fieldnames=fieldnames, encoding='utf-8-sig', delimiter=";")
+
+                    if first_ad:
+                        csv_dictwriter.writeheader()
+
+                    csv_dictwriter.writerow(fields_to_save)
+                    logging.info("[%s]Info to ad: %s has been wrote successfully in csv file", MAIN_INFO_SOURCE, d_ad_info["ad_id"])
+                except Exception as ex:
+                    exception_message = displayException(ex)
+                    logging.exception("[%s]An exception has occurred at the moment to write in csv file to the ad:\n\tAD Id.: %s\n\tAd URL: %s\n%s", MAIN_INFO_SOURCE, d_ad_info["ad_id"], d_ad_info["ad_url"], displayException)
+                    process_info["message"] = process_info["message"] + "\n[%s]An exception has occurred at the moment to write in csv file to the ad:\n\tAD Id.: %s\n\tAd URL: %s\n%s" % (MAIN_INFO_SOURCE, d_ad_info["ad_id"], d_ad_info["ad_url"], displayException)
+            # end if config["store_results_in_csv"]["store"]
+        except Exception as ex:
+            exception_message = displayException(ex)
+            logging.exception("[%s]An exception has occurred getting info from the ad with url: %s\n%s", MAIN_INFO_SOURCE, browser.url, exception_message)
+            process_info["message"] = process_info["message"] + "\n[%s]An exception has occurred getting info from the ad with url: %s\n%s" % (MAIN_INFO_SOURCE, browser.url, displayException)
+
+        #################
+        process_info["success"] = True
+        logging.info("Process to extract info to the ad has been finished, please check your results")
+        process_info["message"] = process_info["message"] + "\nProcess to extract info to the ad has been finished, please check your results"
+        process_info["result"] = d_ad_info
+        return process_info
+        #################
+    # END
+
     @staticmethod
     def get_data_from_encuentra24(user_data, base_resources, config):
         logging.info("Class InmoScrapers - method: get_data_from_encuentra24")
@@ -408,232 +640,124 @@ class InmoScrapers:
                 first_ad = True
 
                 # possible ideas: set a config to get an specific ammount of ads
-                """
-                ATENCION
-                He detectado que el flujoa actual servirá para una N cantidad de sitios
-                mienstras el boton next exista
-
-                Ahora, he verificado que para algunos post, ya el boton de next no aparece, por lo tanto se limita la navegacion, es posible que quizas el flujo del bot deba cambiar a que se vaya a leyendo la lista de sitios y extrayendo las url a visitar para luego volver a la lista e ir extrayendo y asi sucesivamente
-                """
-
                 while(first_ad or exists_more_ads):
-                    d_ad_info = {
-                        "ad_id": "",
-                        "ad_title": "",
-                        "ad_url": "",
-                        "ad_offer_price": "",
-                        "ad_photo": "",
-                        "ad_info_list": [],
-                        "ad_info_str": "",
-                        "ad_details_list": [],
-                        "ad_details_str": "",
-                        "ad_product_features_list": [],
-                        "ad_product_features_str": "",
-                        "ad_contact_info_username": "",
-                        "ad_contact_info_attrs_list": [],
-                        "ad_contact_info_attrs_str": "",
-                        "ad_contact_info_phone": "",
-                        "ad_contact_info_cellphone": "",
-                    }
+                    process_ad_result = InmoScrapers.scraping_data_from_specific_encuentra24_ad(browser, config, first_ad)
 
-                    try:
-                        logging.info("[%s]Getting data from: %s", MAIN_INFO_SOURCE, browser.url)
+                    if not process_ad_result["success"]:
+                        logging.error("%s", process_ad_result["message"])
+                        process_info = process_info + "\n%s" % process_ad_result["message"]
+                        return process_info
 
-                        counter_element_xpath = "//ul[@class = 'pager']/li[@class = 'hidden-xs hidden-sm']"
-                        if browser.is_element_present_by_xpath(counter_element_xpath):
-                            if browser.find_by_xpath(counter_element_xpath).last.text:
-                                logging.info("[%s] %s", MAIN_INFO_SOURCE, browser.find_by_xpath(counter_element_xpath).last.text)
-
-                        # ad id
-                        if browser.is_element_present_by_xpath(ad_id_xpath):
-                            if browser.find_by_xpath(ad_id_xpath).value:
-                                d_ad_info["ad_id"] = browser.find_by_xpath(ad_id_xpath).value
-
-                        # ad title
-                        if browser.is_element_present_by_xpath(ad_title_xpath):
-                            if browser.find_by_xpath(ad_title_xpath).value:
-                                d_ad_info["ad_title"] = browser.find_by_xpath(ad_title_xpath).value.replace(";", " ").replace("|", " ")
-
-                        # ad url
-                        d_ad_info["ad_url"] = browser.url
-
-                        # ad offer price
-                        ad_offer_price_xpath = "//div[@class = 'offer-price']"
-                        if browser.is_element_present_by_xpath(ad_offer_price_xpath):
-                            if browser.find_by_xpath(ad_offer_price_xpath).text:
-                                d_ad_info["ad_offer_price"] = browser.find_by_xpath(ad_offer_price_xpath).text.replace(";", " ")
-
-                        # ad photo
-                        ad_photo_xpath = "//div[@id = 'tabPhotos']/descendant::div[contains(@class, 'slick-current slick-active')]/a/img"
-                        if browser.is_element_present_by_xpath(ad_photo_xpath):
-                            if browser.find_by_xpath(ad_photo_xpath)["src"]:
-                                d_ad_info["ad_photo"] = browser.find_by_xpath(ad_photo_xpath)["src"]
-
-                        # general info to the ad
-                        ad_info_xpath = "//div[@class = 'ad-info']/div/div/div/ul/li"
-                        ad_info_list = []
-                        if browser.is_element_present_by_xpath(ad_info_xpath):
-                            for i in range(0, len(browser.find_by_xpath(ad_info_xpath))):
-                                ad_info_str = ""
-                                ad_specific_infoname_xpath = "%s[%d]/span[@class = 'info-name']" % (ad_info_xpath, (i + 1))
-                                ad_specific_infovalue_xpath = "%s[%d]/span[@class = 'info-value']" % (ad_info_xpath, (i + 1))
-                                if browser.is_element_present_by_xpath(ad_specific_infoname_xpath):
-                                    ad_info_str = ad_info_str + browser.find_by_xpath(ad_specific_infoname_xpath).text.replace(";", " ")
-
-                                if browser.is_element_present_by_xpath(ad_specific_infovalue_xpath):
-                                    ad_info_str = ad_info_str + " " + browser.find_by_xpath(ad_specific_infovalue_xpath).text.replace(";", " ")
-
-                                ad_info_list.append(ad_info_str)
-                            # end for i in range
-                        # end if
-
-                        # parsing ad info list to a str
-                        if len(ad_info_list) > 0:
-                            d_ad_info["ad_info_str"] = "|".join(ad_info_list)
-                            d_ad_info["ad_info_list"] = ad_info_list
-
-                        # details to the add
-                        ad_details_xpath = "//div[@class = 'ad-details']/div/div/div/ul/li"
-                        ad_details_list = []
-                        if browser.is_element_present_by_xpath(ad_details_xpath):
-                            for i in range(0, len(browser.find_by_xpath(ad_details_xpath))):
-                                ad_detail_str = ""
-                                ad_specific_infoname_xpath = "%s[%d]/span[@class = 'info-name']" % (ad_details_xpath, (i + 1))
-                                ad_specific_infovalue_xpath = "%s[%d]/span[@class = 'info-value']" % (ad_details_xpath, (i + 1))
-                                if browser.is_element_present_by_xpath(ad_specific_infoname_xpath):
-                                    ad_detail_str = ad_detail_str + browser.find_by_xpath(ad_specific_infoname_xpath).text.replace(";", " ")
-
-                                if browser.is_element_present_by_xpath(ad_specific_infovalue_xpath):
-                                    ad_detail_str = ad_detail_str + " " + browser.find_by_xpath(ad_specific_infovalue_xpath).text.replace(";", " ")
-
-                                ad_details_list.append(ad_detail_str)
-                            # end for i in range
-                        # end if
-
-                        # parsing ad details list to a str
-                        if len(ad_details_list) > 0:
-                            d_ad_info["ad_details_str"] = "|".join(ad_details_list)
-                            d_ad_info["ad_details_list"] = ad_details_list
-
-                        # ad product features
-                        ad_product_features_xpath = "//ul[@class = 'product-features']/li"
-                        ad_product_features_list = []
-                        if browser.is_element_present_by_xpath(ad_product_features_xpath):
-                            for ad_product_feature in browser.find_by_xpath(ad_product_features_xpath):
-                                if ad_product_feature.text:
-                                    ad_product_features_list.append(ad_product_feature.text.replace(";", " "))
-                            # end for
-                        # end if
-
-                        # parsing ad product features list to a str
-                        if len(ad_product_features_list) > 0:
-                            d_ad_info["ad_product_features_str"] = "|".join(ad_product_features_list)
-                            d_ad_info["ad_product_features_list"] = ad_product_features_list
-
-                        # ad contact info
-                        # ad contact info username
-                        ad_contact_info_username_xpath = "//div[@class = 'user-info']/span[@class = 'user-name']"
-                        if browser.is_element_present_by_xpath(ad_contact_info_username_xpath):
-                            if browser.find_by_xpath(ad_contact_info_username_xpath).text:
-                                d_ad_info["ad_contact_info_username"] = browser.find_by_xpath(ad_contact_info_username_xpath).text.replace(";", " ")
-
-                        # ad contact info attrs
-                        ad_contact_info_attrs_xpath = "//div[@class = 'user-info']/span[@class = 'text-attr']"
-                        ad_contact_info_attrs_list = []
-                        if browser.is_element_present_by_xpath(ad_contact_info_attrs_xpath):
-                            for ad_contact_info_attr in browser.find_by_xpath(ad_contact_info_attrs_xpath):
-                                ad_contact_info_attrs_list.append(ad_contact_info_attr.text.replace(";", " "))
-
-                        # parsing ad contact info attrs list to a str
-                        if len(ad_contact_info_attrs_list) > 0:
-                            d_ad_info["ad_contact_info_attrs_str"] = "|".join(ad_contact_info_attrs_list)
-                            d_ad_info["ad_contact_info_attrs_list"] = ad_contact_info_attrs_list
-
-                        # ad contact info phone
-                        ad_contact_info_phone_xpath = "//div[@class = 'contact-phone']/span[@class = 'phone icon icon-call']"
-                        if browser.is_element_present_by_xpath(ad_contact_info_phone_xpath):
-                            if browser.find_by_xpath(ad_contact_info_phone_xpath).text:
-                                d_ad_info["ad_contact_info_phone"] = browser.find_by_xpath(ad_contact_info_phone_xpath).text.split("\n")[0]
-
-                        # ad contact info cellphone
-                        ad_contact_info_cellphone_xpath = "//div[@class = 'contact-phone']/span[@class = 'cellphone icon icon-call-mobile']"
-                        if browser.is_element_present_by_xpath(ad_contact_info_cellphone_xpath):
-                            if browser.find_by_xpath(ad_contact_info_cellphone_xpath).text:
-                                d_ad_info["ad_contact_info_cellphone"] = browser.find_by_xpath(ad_contact_info_cellphone_xpath).text.split("\n")[0]
-
-                        ################
-                        ads_results.append(d_ad_info)
-
-                        if config["store_results_in_csv"]["store"]:
-                            fieldnames = [
-                                "ad_id",
-                                "ad_title",
-                                "ad_url",
-                                "ad_offer_price",
-                                "ad_photo",
-                                "ad_info_str",
-                                "ad_details_str",
-                                "ad_product_features_str",
-                                "ad_contact_info_username",
-                                "ad_contact_info_attrs_str",
-                                "ad_contact_info_phone",
-                                "ad_contact_info_cellphone",
-                            ]
-
-                            fields_to_save = {
-                                "ad_id": d_ad_info["ad_id"],
-                                "ad_title": d_ad_info["ad_title"],
-                                "ad_url": d_ad_info["ad_url"],
-                                "ad_offer_price": d_ad_info["ad_offer_price"],
-                                "ad_photo": d_ad_info["ad_photo"],
-                                "ad_info_str": d_ad_info["ad_info_str"],
-                                "ad_details_str": d_ad_info["ad_details_str"],
-                                "ad_product_features_str": d_ad_info["ad_product_features_str"],
-                                "ad_contact_info_username": d_ad_info["ad_contact_info_username"],
-                                "ad_contact_info_attrs_str": d_ad_info["ad_contact_info_attrs_str"],
-                                "ad_contact_info_phone": d_ad_info["ad_contact_info_phone"],
-                                "ad_contact_info_cellphone": d_ad_info["ad_contact_info_cellphone"],
-                            }
-
-                            try:
-                                file_csv = open("%s/%s" % (config["store_results_in_csv"]["dir_to_store"], config["store_results_in_csv"]["filename"]), "a+")
-                                csv_dictwriter = unicodecsv.DictWriter(file_csv, fieldnames=fieldnames, encoding='utf-8-sig', delimiter=";")
-
-                                if first_ad:
-                                    csv_dictwriter.writeheader()
-
-                                csv_dictwriter.writerow(fields_to_save)
-                                logging.info("[%s]Info to ad: %s has been wrote successfully in csv file", MAIN_INFO_SOURCE, d_ad_info["ad_id"])
-                            except Exception as ex:
-                                exception_message = displayException(ex)
-                                logging.exception("[%s]An exception has occurred at the moment to write in csv file to the ad:\n\tAD Id.: %s\n\tAd URL: %s\n%s", MAIN_INFO_SOURCE, d_ad_info["ad_id"], d_ad_info["ad_url"], displayException)
-                                process_info["message"] = process_info["message"] + "\n[%s]An exception has occurred at the moment to write in csv file to the ad:\n\tAD Id.: %s\n\tAd URL: %s\n%s" % (MAIN_INFO_SOURCE, d_ad_info["ad_id"], d_ad_info["ad_url"], displayException)
-                        # end if config["store_results_in_csv"]["store"]
-                    except Exception as ex:
-                        exception_message = displayException(ex)
-                        logging.exception("[%s]An exception has occurred getting info from the ad with url: %s\n%s", MAIN_INFO_SOURCE, browser.url, displayException)
-                        process_info["message"] = process_info["message"] + "\n[%s]An exception has occurred getting info from the ad with url: %s\n%s" % (MAIN_INFO_SOURCE, browser.url, displayException)
+                    ads_results.append(process_ad_result["result"])
 
                     ###########################
+                    first_ad = False
                     # next ads
                     next_ad_xpath = "//ul[@class = 'pager']/li/a[@class = 'next']"
 
                     if not browser.is_element_present_by_xpath(next_ad_xpath):
-                        logging.info("[%s]No elements could be found to check if exists or not more ads. Doesn't exist more ads", MAIN_INFO_SOURCE)
+                        logging.info("[%s]No elements could be found to check if exists or not more ads. Going to check if exist more elements with list alternative method", MAIN_INFO_SOURCE)
                         exists_more_ads = False
                         continue
 
                     next_ad_link = browser.find_by_xpath(next_ad_xpath)["href"]
                     if not next_ad_link:
-                        logging.info("[%s]Link to next site is empty, doesn't exist more ads", MAIN_INFO_SOURCE)
+                        logging.info("[%s]Link to next site is empty, doesn't exist more ads. Going to check if exist more elements with list alternative method", MAIN_INFO_SOURCE)
                         exists_more_ads = False
                         continue
 
-                    first_ad = False
                     exists_more_ads = True
                     sleep(2)
                     browser.visit(next_ad_link)
                     #############################
+                # END while
+
+                # finding element to go back to the list
+                list_element_xpath = "//ul[@class = 'pager']/li/a[@class = 'prev']"
+                if not browser.is_element_present_by_xpath(list_element_xpath):
+                    logging.info("[%s]No elements could be found to check if exists or not more ads. Doesn't exist more ads (alternative to check by the list)", MAIN_INFO_SOURCE)
+                    continue
+
+                list_element_link = browser.find_by_xpath(list_element_xpath).first["href"]
+                if not list_element_link:
+                    logging.info("[%s]Link to list page is empty, maybe doesn't exist more ads (alternative to check by the list)", MAIN_INFO_SOURCE)
+                    continue
+
+                if not "#page=100" in list_element_link:
+                    browser.visit(list_element_link + "#page=100")
+                else:
+                    browser.visit(list_element_link)
+
+                sleep(10)
+                next_button_xpath = "//ul[@class = 'pagination']/li[@class = 'arrow']/a[@title = 'Continuar']"
+                if not browser.is_element_present_by_xpath(next_button_xpath):
+                    logging.info("[%s]Hasn't been found button to the next page of results. Doesn't exist more results", MAIN_INFO_SOURCE)
+                    continue
+
+                next_button_link = browser.find_by_xpath(next_button_xpath)["href"]
+                logging.info("[%s]URL to next page: %s", MAIN_INFO_SOURCE, next_button_link)
+                if not next_button_link:
+                    logging.info("[%s]Link to the next page of results is empty. Doesn't exist more results", MAIN_INFO_SOURCE)
+                    continue
+
+                browser.visit(next_button_link)
+                sleep(5)
+                browser.reload()
+                sleep(5)
+
+                exists_more_ads = True
+
+                while exists_more_ads:
+                    origin_list_url = browser.url
+                    ads_url_list = []
+
+                    ad_list_elements_xpath = "//div[@id = 'listingview']/div/article/div[@class = 'ann-box-details']/a"
+                    if not browser.is_element_present_by_xpath(ad_list_elements_xpath):
+                        logging.error("[%s]Ad elements haven't been detected in the list, maybe the list is empty and doesn't exist mored ads", MAIN_INFO_SOURCE)
+                        process_info["message"] = process_info["message"] + "\n[%s]Ad elements haven't been detected in the list, maybe the list is empty and doesn't exist mored ads" % (MAIN_INFO_SOURCE)
+                        exists_more_ads = False
+                        continue
+
+                    # getting all ads url from the list
+                    for ad_list_element in browser.find_by_xpath(ad_list_elements_xpath):
+                        if ad_list_element["href"]:
+                            ads_url_list.append(ad_list_element["href"])
+
+                    # going to each element in the list
+                    for ad_url in ads_url_list:
+                        browser.visit(ad_url)
+                        process_ad_result = InmoScrapers.scraping_data_from_specific_encuentra24_ad(browser, config, first_ad)
+                        if not process_ad_result["success"]:
+                            logging.error("%s", process_ad_result["message"])
+                            process_info = process_info + "\n%s" % process_ad_result["message"]
+                            return process_info
+
+                        ads_results.append(process_ad_result["result"])
+                    # END for ad_url in ads_url_list
+
+                    # going back to origin list to cheack if exist more list
+                    logging.info("[%s]Returning to: %s", MAIN_INFO_SOURCE, origin_list_url)
+                    browser.visit(origin_list_url)
+
+                    sleep(10)
+                    # checking for more lists
+                    next_button_xpath = "//ul[@class = 'pagination']/li[@class = 'arrow']/a[@title = 'Continuar']"
+                    if not browser.is_element_present_by_xpath(next_button_xpath):
+                        logging.info("[%s]Hasn't been found button to the next page of results. Doesn't exist more results", MAIN_INFO_SOURCE)
+                        exists_more_ads = False
+                        continue
+
+                    next_button_link = browser.find_by_xpath(next_button_xpath)["href"]
+                    logging.info("[%s]URL to next page: %s", MAIN_INFO_SOURCE, next_button_link)
+                    if not next_button_link:
+                        logging.info("[%s]Link to the next page of results is empty. Doesn't exist more results", MAIN_INFO_SOURCE)
+                        exists_more_ads = False
+                        continue
+
+                    browser.visit(next_button_link)
+                    sleep(5)
+                    browser.reload()
+                    sleep(5)
                 # END while
             except Exception as ex:
                 exception_message = displayException(ex)
