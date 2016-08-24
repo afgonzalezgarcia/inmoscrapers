@@ -748,7 +748,7 @@ class InmoScrapers:
                         continue
 
                     next_button_link = browser.find_by_xpath(next_button_xpath)["href"]
-                    logging.info("[%s]URL to next page: %s", MAIN_INFO_SOURCE, next_button_link)
+                    logging.info("[%s]IMPORTANT URL to next page: %s", MAIN_INFO_SOURCE, next_button_link)
                     if not next_button_link:
                         logging.info("[%s]Link to the next page of results is empty. Doesn't exist more results", MAIN_INFO_SOURCE)
                         exists_more_ads = False
