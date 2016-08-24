@@ -1,0 +1,12 @@
+ghostdriver.log
+*.sw*
+*.pyc
+*.sqlite
+*.save*
+*.orig
+*.*~
+*.log
+*.out
+logs/
+results/
+sites_csv/
