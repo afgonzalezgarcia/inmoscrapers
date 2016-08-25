@@ -665,10 +665,12 @@ class InmoScrapers:
                         logging.info("[%s]Link to list page is empty, maybe doesn't exist more ads (alternative to check by the list)", MAIN_INFO_SOURCE)
                         continue
 
-                    if not ("#page=100" in list_element_link):
-                        browser.visit(list_element_link + "#page=100")
-                    else:
+                    if ("#page=" in list_element_link):
                         browser.visit(list_element_link)
+                    elif ("#search=" in list_element_link) and (not ("#page" in list_element_link)):
+                        browser.visit(list_element_link + "&page=100")
+                    else:
+                        browser.visit(list_element_link + "#page=100")
 
                     sleep(10)
                     next_button_xpath = "//ul[@class = 'pagination']/li[@class = 'arrow']/a[@title = 'Continuar']"
