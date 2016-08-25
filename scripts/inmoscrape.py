@@ -610,106 +610,88 @@ class InmoScrapers:
                 # ads title xpath
                 ad_title_xpath = "//h1[@class = 'product-title']"
 
-                if browser.is_element_present_by_id(list_view_toggle_id, 1) or browser.is_element_present_by_id(gallery_view_toggle_id, 1):
-                    logging.info("[%s]Starting from a list, going to extract the first element", MAIN_INFO_SOURCE)
-
-                    list_elements_xpath = "//div[@id = 'listingview']/div/article/div[@class = 'ann-box-details']/a"
-                    if not browser.is_element_present_by_xpath(list_elements_xpath):
-                        logging.error("[%s]List elements haven't been detected, maybe the list supplied is empty, please check and try again", MAIN_INFO_SOURCE)
-                        process_info["message"] = process_info["message"] + "\n[%s]List elements haven't been detected, maybe the list supplied is empty, please check and try again" % (MAIN_INFO_SOURCE)
-                        return process_info
-
-                    first_ad_link = browser.find_by_xpath(list_elements_xpath)[0]["href"]
-                    if not first_ad_link:
-                        logging.error("[%s]Link to the first element to the list is empty, please check it and try again", MAIN_INFO_SOURCE)
-                        process_info["message"] = process_info["message"] + "\n[%s]Link to the first element to the list is empty, please check it and try again" % (MAIN_INFO_SOURCE)
-                        return process_info
-
-                    browser.visit(first_ad_link)
-                elif browser.is_element_present_by_xpath(ad_id_xpath) or browser.is_element_present_by_xpath(ad_title_xpath):
-                    logging.info("[%s]Starting from a specific ad, going to extract its info", MAIN_INFO_SOURCE)
-                else:
-                    logging.error("[%s]Elements to check if supplied url is a list or a specific post haven't been detected, please check url supplied and make sure that is a correct url\nURL: %s", MAIN_INFO_SOURCE, site["url"])
-                    process_info["message"] = process_info["message"] + "\n[%s]Elements to check if supplied url is a list or a specific post haven't been detected, please check url supplied and make sure that is a correct url\nURL: %s" % (MAIN_INFO_SOURCE, site["url"])
-                    return process_info
-
                 # to check if exists more ads
                 exists_more_ads = False
 
-                # to allow execute the bucle to the first element
+                # to allow execute bucle to the first element
                 first_ad = True
 
                 # possible ideas: set a config to get an specific ammount of ads
-                while(first_ad or exists_more_ads):
-                    process_ad_result = InmoScrapers.scraping_data_from_specific_encuentra24_ad(browser, config, first_ad)
 
-                    if not process_ad_result["success"]:
-                        logging.error("%s", process_ad_result["message"])
-                        process_info = process_info + "\n%s" % process_ad_result["message"]
-                        return process_info
+                # checking if first url is a specific ad
+                if browser.is_element_present_by_xpath(ad_id_xpath) or browser.is_element_present_by_xpath(ad_title_xpath):
+                    logging.info("[%s]Starting from a specific ad, going to extract its info", MAIN_INFO_SOURCE)
 
-                    ads_results.append(process_ad_result["result"])
+                    while(first_ad or exists_more_ads):
+                        process_ad_result = InmoScrapers.scraping_data_from_specific_encuentra24_ad(browser, config, first_ad)
 
-                    ###########################
-                    first_ad = False
-                    # next ads
-                    next_ad_xpath = "//ul[@class = 'pager']/li/a[@class = 'next']"
+                        if not process_ad_result["success"]:
+                            logging.error("%s", process_ad_result["message"])
+                            process_info = process_info + "\n%s" % process_ad_result["message"]
+                            return process_info
 
-                    if not browser.is_element_present_by_xpath(next_ad_xpath):
-                        logging.info("[%s]No elements could be found to check if exists or not more ads. Going to check if exist more elements with list alternative method", MAIN_INFO_SOURCE)
-                        exists_more_ads = False
+                        ads_results.append(process_ad_result["result"])
+
+                        ###########################
+                        first_ad = False
+                        # next ads
+                        next_ad_xpath = "//ul[@class = 'pager']/li/a[@class = 'next']"
+
+                        if not browser.is_element_present_by_xpath(next_ad_xpath):
+                            logging.info("[%s]No elements could be found to check if exists or not more ads. Going to check if exist more elements with list alternative method", MAIN_INFO_SOURCE)
+                            exists_more_ads = False
+                            continue
+
+                        next_ad_link = browser.find_by_xpath(next_ad_xpath)["href"]
+                        if not next_ad_link:
+                            logging.info("[%s]Link to next site is empty, doesn't exist more ads. Going to check if exist more elements with list alternative method", MAIN_INFO_SOURCE)
+                            exists_more_ads = False
+                            continue
+
+                        exists_more_ads = True
+                        sleep(2)
+                        browser.visit(next_ad_link)
+                        #############################
+                    # END while
+
+                    # finding element to go back to the list
+                    list_element_xpath = "//ul[@class = 'pager']/li/a[@class = 'prev']"
+                    if not browser.is_element_present_by_xpath(list_element_xpath):
+                        logging.info("[%s]No elements could be found to check if exists or not more ads. Doesn't exist more ads (alternative to check by the list)", MAIN_INFO_SOURCE)
                         continue
 
-                    next_ad_link = browser.find_by_xpath(next_ad_xpath)["href"]
-                    if not next_ad_link:
-                        logging.info("[%s]Link to next site is empty, doesn't exist more ads. Going to check if exist more elements with list alternative method", MAIN_INFO_SOURCE)
-                        exists_more_ads = False
+                    list_element_link = browser.find_by_xpath(list_element_xpath).first["href"]
+                    if not list_element_link:
+                        logging.info("[%s]Link to list page is empty, maybe doesn't exist more ads (alternative to check by the list)", MAIN_INFO_SOURCE)
                         continue
+
+                    if not ("#page=100" in list_element_link):
+                        browser.visit(list_element_link + "#page=100")
+                    else:
+                        browser.visit(list_element_link)
+
+                    sleep(10)
+                    next_button_xpath = "//ul[@class = 'pagination']/li[@class = 'arrow']/a[@title = 'Continuar']"
+                    if not browser.is_element_present_by_xpath(next_button_xpath):
+                        logging.info("[%s]Hasn't been found button to the next page of results. Doesn't exist more results", MAIN_INFO_SOURCE)
+                        continue
+
+                    next_button_link = browser.find_by_xpath(next_button_xpath)["href"]
+                    logging.info("[%s]IMPORTANT - URL to next page: %s", MAIN_INFO_SOURCE, next_button_link)
+                    if not next_button_link:
+                        logging.info("[%s]Link to next page of results is empty. Doesn't exist more results", MAIN_INFO_SOURCE)
+                        continue
+
+                    browser.visit(next_button_link)
+                    sleep(5)
+                    browser.reload()
+                    sleep(5)
 
                     exists_more_ads = True
-                    sleep(2)
-                    browser.visit(next_ad_link)
-                    #############################
-                # END while
+                # END if specific ad
 
-                # finding element to go back to the list
-                list_element_xpath = "//ul[@class = 'pager']/li/a[@class = 'prev']"
-                if not browser.is_element_present_by_xpath(list_element_xpath):
-                    logging.info("[%s]No elements could be found to check if exists or not more ads. Doesn't exist more ads (alternative to check by the list)", MAIN_INFO_SOURCE)
-                    continue
-
-                list_element_link = browser.find_by_xpath(list_element_xpath).first["href"]
-                if not list_element_link:
-                    logging.info("[%s]Link to list page is empty, maybe doesn't exist more ads (alternative to check by the list)", MAIN_INFO_SOURCE)
-                    continue
-
-                if not "#page=100" in list_element_link:
-                    browser.visit(list_element_link + "#page=100")
-                else:
-                    browser.visit(list_element_link)
-
-                sleep(10)
-                next_button_xpath = "//ul[@class = 'pagination']/li[@class = 'arrow']/a[@title = 'Continuar']"
-                if not browser.is_element_present_by_xpath(next_button_xpath):
-                    logging.info("[%s]Hasn't been found button to the next page of results. Doesn't exist more results", MAIN_INFO_SOURCE)
-                    continue
-
-                next_button_link = browser.find_by_xpath(next_button_xpath)["href"]
-                logging.info("[%s]URL to next page: %s", MAIN_INFO_SOURCE, next_button_link)
-                if not next_button_link:
-                    logging.info("[%s]Link to the next page of results is empty. Doesn't exist more results", MAIN_INFO_SOURCE)
-                    continue
-
-                browser.visit(next_button_link)
-                sleep(5)
-                browser.reload()
-                sleep(5)
-
-                exists_more_ads = True
-
-                while exists_more_ads:
-                    origin_list_url = browser.url
-                    ads_url_list = []
+                if (browser.is_element_present_by_id(list_view_toggle_id, 1) or browser.is_element_present_by_id(gallery_view_toggle_id, 1)) or (exists_more_ads):
+                    logging.info("[%s]Getting from a list, going to check and extract its elements", MAIN_INFO_SOURCE)
 
                     ad_list_elements_xpath = "//div[@id = 'listingview']/div/article/div[@class = 'ann-box-details']/a"
                     if not browser.is_element_present_by_xpath(ad_list_elements_xpath):
@@ -717,48 +699,68 @@ class InmoScrapers:
                         process_info["message"] = process_info["message"] + "\n[%s]Ad elements haven't been detected in the list, maybe the list is empty and doesn't exist mored ads" % (MAIN_INFO_SOURCE)
                         exists_more_ads = False
                         continue
+                    else:
+                        exists_more_ads = True
 
-                    # getting all ads url from the list
-                    for ad_list_element in browser.find_by_xpath(ad_list_elements_xpath):
-                        if ad_list_element["href"]:
-                            ads_url_list.append(ad_list_element["href"])
+                    while exists_more_ads:
+                        origin_list_url = browser.url
+                        ads_url_list = []
 
-                    # going to each element in the list
-                    for ad_url in ads_url_list:
-                        browser.visit(ad_url)
-                        process_ad_result = InmoScrapers.scraping_data_from_specific_encuentra24_ad(browser, config, first_ad)
-                        if not process_ad_result["success"]:
-                            logging.error("%s", process_ad_result["message"])
-                            process_info = process_info + "\n%s" % process_ad_result["message"]
-                            return process_info
+                        if not browser.is_element_present_by_xpath(ad_list_elements_xpath):
+                            logging.error("[%s]Ad elements haven't been detected in the list, maybe the list is empty and doesn't exist mored ads", MAIN_INFO_SOURCE)
+                            process_info["message"] = process_info["message"] + "\n[%s]Ad elements haven't been detected in the list, maybe the list is empty and doesn't exist mored ads" % (MAIN_INFO_SOURCE)
+                            exists_more_ads = False
+                            continue
 
-                        ads_results.append(process_ad_result["result"])
-                    # END for ad_url in ads_url_list
+                        # getting all ads url from the list
+                        for ad_list_element in browser.find_by_xpath(ad_list_elements_xpath):
+                            if ad_list_element["href"]:
+                                ads_url_list.append(ad_list_element["href"])
 
-                    # going back to origin list to cheack if exist more list
-                    logging.info("[%s]Returning to: %s", MAIN_INFO_SOURCE, origin_list_url)
-                    browser.visit(origin_list_url)
+                        # going to each element in the list
+                        for ad_url in ads_url_list:
+                            browser.visit(ad_url)
+                            process_ad_result = InmoScrapers.scraping_data_from_specific_encuentra24_ad(browser, config, first_ad)
+                            if first_ad:
+                                first_ad = False
 
-                    sleep(10)
-                    # checking for more lists
-                    next_button_xpath = "//ul[@class = 'pagination']/li[@class = 'arrow']/a[@title = 'Continuar']"
-                    if not browser.is_element_present_by_xpath(next_button_xpath):
-                        logging.info("[%s]Hasn't been found button to the next page of results. Doesn't exist more results", MAIN_INFO_SOURCE)
-                        exists_more_ads = False
-                        continue
+                            if not process_ad_result["success"]:
+                                logging.error("%s", process_ad_result["message"])
+                                process_info = process_info + "\n%s" % process_ad_result["message"]
+                                return process_info
 
-                    next_button_link = browser.find_by_xpath(next_button_xpath)["href"]
-                    logging.info("[%s]IMPORTANT URL to next page: %s", MAIN_INFO_SOURCE, next_button_link)
-                    if not next_button_link:
-                        logging.info("[%s]Link to the next page of results is empty. Doesn't exist more results", MAIN_INFO_SOURCE)
-                        exists_more_ads = False
-                        continue
+                            ads_results.append(process_ad_result["result"])
+                        # END for ad_url in ads_url_list
 
-                    browser.visit(next_button_link)
-                    sleep(5)
-                    browser.reload()
-                    sleep(5)
-                # END while
+                        # going back to origin list to check if exist more list
+                        logging.info("[%s]Returning to: %s", MAIN_INFO_SOURCE, origin_list_url)
+                        browser.visit(origin_list_url)
+
+                        sleep(10)
+                        # checking for more lists
+                        next_button_xpath = "//ul[@class = 'pagination']/li[@class = 'arrow']/a[@title = 'Continuar']"
+                        if not browser.is_element_present_by_xpath(next_button_xpath):
+                            logging.info("[%s]Hasn't been found button to the next page of results. Doesn't exist more results", MAIN_INFO_SOURCE)
+                            exists_more_ads = False
+                            continue
+
+                        next_button_link = browser.find_by_xpath(next_button_xpath)["href"]
+                        logging.info("[%s]IMPORTANT URL to next page: %s", MAIN_INFO_SOURCE, next_button_link)
+                        if not next_button_link:
+                            logging.info("[%s]Link to the next page of results is empty. Doesn't exist more results", MAIN_INFO_SOURCE)
+                            exists_more_ads = False
+                            continue
+
+                        browser.visit(next_button_link)
+                        sleep(5)
+                        browser.reload()
+                        sleep(5)
+                    # END while
+                else:
+                    logging.error("[%s]Elements to check if url is a list or a specific post haven't been detected, maybe doesn't exist ads to this url\nURL: %s", MAIN_INFO_SOURCE, site["url"])
+                    process_info["message"] = process_info["message"] + "\n[%s]Elements to check if url is a list or a specific post haven't been detected, maybe doesn't exist ads to this url\nURL: %s" % (MAIN_INFO_SOURCE, site["url"])
+                    continue
+                # END if list
             except Exception as ex:
                 exception_message = displayException(ex)
                 logging.exception("[%s]An exception has ocurred in the method 'get_data_from_encuentra24'\n%s", MAIN_INFO_SOURCE, exception_message)
