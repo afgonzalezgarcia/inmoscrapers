@@ -672,7 +672,8 @@ class InmoScrapers:
                     else:
                         browser.visit(list_element_link + "#page=100")
 
-                    sleep(10)
+                    # sleep(10)
+                    sleep(5)
                     next_button_xpath = "//ul[@class = 'pagination']/li[@class = 'arrow']/a[@title = 'Continuar']"
                     if not browser.is_element_present_by_xpath(next_button_xpath):
                         logging.info("[%s]Hasn't been found button to the next page of results. Doesn't exist more results", MAIN_INFO_SOURCE)
@@ -685,9 +686,11 @@ class InmoScrapers:
                         continue
 
                     browser.visit(next_button_link)
-                    sleep(5)
+                    # sleep(5)
+                    sleep(2)
                     browser.reload()
-                    sleep(5)
+                    # sleep(5)
+                    sleep(2)
 
                     exists_more_ads = True
                 # END if specific ad
@@ -738,7 +741,8 @@ class InmoScrapers:
                         logging.info("[%s]Returning to: %s", MAIN_INFO_SOURCE, origin_list_url)
                         browser.visit(origin_list_url)
 
-                        sleep(10)
+                        # sleep(10)
+                        sleep(5)
                         # checking for more lists
                         next_button_xpath = "//ul[@class = 'pagination']/li[@class = 'arrow']/a[@title = 'Continuar']"
                         if not browser.is_element_present_by_xpath(next_button_xpath):
@@ -754,9 +758,11 @@ class InmoScrapers:
                             continue
 
                         browser.visit(next_button_link)
-                        sleep(5)
+                        # sleep(5)
+                        sleep(2)
                         browser.reload()
-                        sleep(5)
+                        # sleep(5)
+                        sleep(2)
                     # END while
                 else:
                     logging.error("[%s]Elements to check if url is a list or a specific post haven't been detected, maybe doesn't exist ads to this url\nURL: %s", MAIN_INFO_SOURCE, site["url"])
